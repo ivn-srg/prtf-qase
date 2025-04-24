@@ -46,46 +46,112 @@
   <summary>Сетевой менеджер</summary>
   
   ```swift
-  protocol NetworkManager: AnyObject {
-      func performRequest<T: Decodable>(
-          with data: any Encodable,
-          from urlString: String,
-          method: HTTPMethod,
-          modelType: T.Type
-      ) async throws -> T
+  struct API {
+    static let BASE_URL = "https://api.qase.io/v1"
+    
+    enum NetError: Error {
+        case invalidURL, parsingError(String), serializationError(String),
+             noInternetConnection, timeout, otherNetworkError(String), invalidCredantials
+    }
+    
+    enum HTTPMethod: String {
+        case get = "GET"
+        case post = "POST"
+        case patch = "PATCH"
+        case delete = "DELETE"
+    }
+    
+    enum Endpoint: String, CaseIterable {
+        case project = "project"
+        case suites = "suite"
+        case cases = "case"
         
-      func makeHTTPRequest<T: Decodable>(
-          for request: URLRequest,
-          codableModelType: T.Type
-      ) async throws -> T
+        func returnAllEnumCases() -> [String] {
+            var listOfCases = [String]()
+            
+            for caseValue in Self.allCases {
+                listOfCases.append(caseValue.rawValue)
+            }
+            
+            return listOfCases
+        }
+    }
+    
+    enum QueryParams: String {
+        case limit = "limit"
+        case offset = "offset"
+        case suiteId = "suite_id"
+        case search = "search"
+    }
   }
 
+  protocol NetworkManager: AnyObject {
+      func performRequest<T: Decodable>(
+          with data: Encodable?,
+          from urlString: URL?,
+          method: API.HTTPMethod,
+          modelType: T.Type
+      ) async throws(API.NetError) -> T
+      
+      func composeURL(for method: API.Endpoint, urlComponents: [String?]?, queryItems: [API.QueryParams: Int?]?) -> URL?
+      
+      func auth(by token: String) async throws -> Bool
+  }
+  
   final class APIManager: NetworkManager {
       static let shared = APIManager()
       
-      let DOMEN = "https://api.qase.io/v1"
+      func auth(by token: String) async throws -> Bool {
+          guard
+              !token.isEmpty,
+              let url = composeURL(for: .project, urlComponents: nil)
+          else {
+              return false
+          }
+          
+          var request = URLRequest(url: url)
+          request.httpMethod = "GET"
+          request.addValue(token, forHTTPHeaderField: "Token")
+          
+          let (_, response) = try await URLSession.shared.data(for: request)
+          
+          guard let httpResponse = response as? HTTPURLResponse else {
+              throw URLError(.badServerResponse)
+          }
+          
+          guard (200...299).contains(httpResponse.statusCode) else {
+              return false
+          }
+          
+          return true
+      }
       
       func performRequest<T: Decodable>(
-          with data: any Encodable = Optional<Data>.none,
-          from urlString: String,
-          method: HTTPMethod,
+          with data: Encodable? = nil,
+          from urlString: URL?,
+          method: API.HTTPMethod,
           modelType: T.Type
-      ) async throws -> T {
-          guard let url = URL(string: urlString) else { throw APIError.invalidURL }
+      ) async throws(API.NetError) -> T {
+          guard
+              let url = urlString,
+              let authToken = AuthManager.shared.getAuthToken()
+          else { throw .invalidURL }
           
           var request = URLRequest(url: url)
           request.httpMethod = method.rawValue
-          request.addValue(TOKEN, forHTTPHeaderField: "Token")
+          request.addValue(authToken, forHTTPHeaderField: "Token")
           
-          if !(data is Optional<Data>) {
+          if let data = data {
+              let encoder = JSONEncoder()
               let jsonData: Data
+              encoder.keyEncodingStrategy = .convertToSnakeCase
               do {
-                  jsonData = try JSONEncoder().encode(data)
-              } catch let error as EncodingError {
-                  throw APIError.serializationError(error)
+                  jsonData = try encoder.encode(data)
+                  request.httpBody = jsonData
+                  request.addValue("application/json", forHTTPHeaderField: "content-type")
+              } catch {
+                  throw .serializationError(error.localizedDescription)
               }
-              request.httpBody = jsonData
-              request.addValue("application/json", forHTTPHeaderField: "content-type")
           }
           
           if method == .delete || method == .get {
@@ -95,10 +161,12 @@
           return try await makeHTTPRequest(for: request, codableModelType: modelType)
       }
       
-      internal func makeHTTPRequest<T: Decodable>(
+      private func makeHTTPRequest<T: Decodable>(
           for request: URLRequest,
           codableModelType: T.Type
-      ) async throws -> T {
+      ) async throws(API.NetError) -> T {
+          var errorMessage = ""
+          
           do {
               let (data, _) = try await URLSession.shared.data(for: request)
               do {
@@ -106,114 +174,154 @@
                   return result
               } catch {
                   let errorModel = try JSONDecoder().decode(ResponseWithErrorModel.self, from: data)
-                  let errorMessage = StringError(errorModel.errorMessage)
-                  throw APIError.parsingError(errorMessage)
+                  
+                  errorMessage = errorModel.errorMessage != nil
+                  ? errorModel.errorMessage!
+                  : errorModel.message != nil ? errorModel.message! : ""
               }
+              throw API.NetError.parsingError(errorMessage)
           } catch let error as DecodingError {
-              throw APIError.parsingError(error)
-          } catch let error as URLError {
-              switch error.code {
-              case .notConnectedToInternet:
-                  throw APIError.noInternetConnection
-              case .timedOut:
-                  throw APIError.timeout
-              default:
-                  throw APIError.otherNetworkError(error)
-              }
+              throw .parsingError(error.errorDescription ?? error.localizedDescription)
           } catch {
-              throw APIError.otherNetworkError(error)
+              guard errorMessage.isEmpty else { throw .parsingError(errorMessage) }
+              throw .otherNetworkError(error.localizedDescription)
           }
       }
       
-      func formUrlString(
-          APIMethod: APIEndpoint,
-          codeOfProject: String?,
-          limit: Int?,
-          offset: Int?,
-          parentSuite: ParentSuite?,
-          caseId: Int?
-      ) -> String? {
+      func composeURL(for method: API.Endpoint, urlComponents: [String?]?, queryItems: [API.QueryParams: Int?]? = nil) -> URL? {
           
-          switch APIMethod {
-          case .project:
-              if let limit = limit, let offset = offset {
-                  return "\(DOMEN)/project?limit=\(limit)&offset=\(offset)"
-              } else if let codeOfProject = codeOfProject {
-                  return "\(DOMEN)/project/\(codeOfProject)"
-              } else {
-                  return "\(DOMEN)/project"
-              }
-          case .suites:
-              guard let codeOfProject = codeOfProject else { return nil }
-              guard let limit = limit, let offset = offset else {
-                  return "\(DOMEN)/suite/\(codeOfProject)"
-              }
-              guard let parentSuite = parentSuite else {
-                  return "\(DOMEN)/suite/\(codeOfProject)?limit=\(limit)&offset=\(offset)"
-              }
-              guard
-                  let searchSuiteString = parentSuite.title.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
-              else { return nil }
-              
-              return "\(DOMEN)/suite/\(codeOfProject)?search=\"\(searchSuiteString)\"&limit=\(limit)&offset=\(offset)"
-          case .cases:
-              guard let codeOfProject = codeOfProject else { return nil }
-              guard let limit = limit, let offset = offset else {
-                  return "\(DOMEN)/case/\(codeOfProject)"
-              }
-              guard let parentSuite = parentSuite else {
-                  return "\(DOMEN)/case/\(codeOfProject)?limit=\(limit)&offset=\(offset)"
-              }
-              
-              return "\(DOMEN)/case/\(codeOfProject)?suite_id=\(parentSuite.id)&limit=\(limit)&offset=\(offset)"
-          case .openedCase:
-              guard let codeOfProject = codeOfProject else { return nil }
-              guard let caseId = caseId else { return nil }
-              
-              return "\(DOMEN)/case/\(codeOfProject)/\(caseId)"
-          }
-      }
-  }
-
-  enum APIError: Error {
-      case invalidURL, parsingError(Error), serializationError(Error), noInternetConnection, timeout, otherNetworkError(Error)
-  }
-
-  enum HTTPMethod: String {
-      case get = "GET"
-      case post = "POST"
-      case patch = "PATCH"
-      case delete = "DELETE"
-  }
-
-  enum APIEndpoint: String, CaseIterable {
-      case project = "project"
-      case suites = "suite"
-      case cases = "case"
-      case openedCase = ""
-      
-      func returnAllEnumCases() -> [String] {
-          var listOfCases = [String]()
+          var resultUrl = URL(string: "\(API.BASE_URL)/\(method.rawValue)")
           
-          for caseValue in APIEndpoint.allCases {
-              listOfCases.append(caseValue.rawValue)
+          if let urlComponents = urlComponents {
+              for component in urlComponents {
+                  guard let component = component else { continue }
+                  
+                  resultUrl = resultUrl?.appendingPathComponent(component)
+              }
           }
           
-          return listOfCases
+          if let queryItems = queryItems {
+              var queryDict = [URLQueryItem]()
+              
+              for item in queryItems {
+                  guard let itemValue = item.value else { continue }
+                  
+                  queryDict.append(URLQueryItem(name: item.key.rawValue, value: "\(itemValue)"))
+              }
+              
+              resultUrl?.append(queryItems: queryDict)
+          }
+          
+          return resultUrl
       }
   }
-
-  struct StringError: Error {
-      let message: String
+  
+  final class APIMockManager: NetworkManager {
+      static let shared = APIMockManager()
       
-      init(_ message: String) {
-          self.message = message
+      func auth(by token: String) async throws -> Bool { true }
+      
+      func performRequest<T: Decodable>(
+          with data: Encodable? = nil,
+          from urlString: URL?,
+          method: API.HTTPMethod,
+          modelType: T.Type
+      ) async throws(API.NetError) -> T {
+          guard let url = urlString else { throw .invalidURL }
+          
+          return try await makeHTTPRequest(for: URLRequest(url: url), codableModelType: modelType)
+      }
+      
+      private func makeHTTPRequest<T: Decodable>(
+          for request: URLRequest,
+          codableModelType: T.Type
+      ) async throws(API.NetError) -> T {
+          let errorMessage = ""
+          
+          do {
+              try await Task.sleep(nanoseconds: 2000)
+              
+              let path = request.url?.pathComponents.last!
+              
+              let inputCase = API.Endpoint(rawValue: path ?? "")
+              var resourceName: String
+              
+              switch inputCase {
+              case .project:
+                  resourceName = "project_data"
+              case .suites:
+                  resourceName = "suites_data"
+              case .cases:
+                  resourceName = "test_cases_data"
+              case nil:
+                  resourceName = "project_data"
+              }
+              
+              guard let filePath = Bundle.main.path(forResource: "\(resourceName)", ofType: "json")
+              else {
+                  print("Файл не найден")
+                  throw API.NetError.invalidURL
+              }
+              
+              let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
+              
+              let result = try JSONDecoder().decode(codableModelType, from: data)
+              return result
+              
+          } catch let error as DecodingError {
+              throw .parsingError(error.errorDescription ?? error.localizedDescription)
+          } catch {
+              guard errorMessage.isEmpty else { throw .parsingError(errorMessage) }
+              throw .otherNetworkError(error.localizedDescription)
+          }
+      }
+      
+      func composeURL(for method: API.Endpoint, urlComponents: [String?]?, queryItems: [API.QueryParams: Int?]? = nil) -> URL? {
+          
+          var resultUrl = URL(string: "\(API.BASE_URL)/\(method.rawValue)")
+          
+          if let urlComponents = urlComponents {
+              for component in urlComponents {
+                  guard let component = component else { continue }
+                  
+                  resultUrl = resultUrl?.appendingPathComponent(component)
+              }
+          }
+          
+          if let queryItems = queryItems {
+              var queryDict = [URLQueryItem]()
+              
+              for item in queryItems {
+                  guard let itemValue = item.value else { continue }
+                  
+                  queryDict.append(URLQueryItem(name: item.key.rawValue, value: "\(itemValue)"))
+              }
+              
+              resultUrl?.append(queryItems: queryDict)
+          }
+          
+          return resultUrl
       }
   }
-
-  extension StringError: LocalizedError {
-      var errorDescription: String? {
-          return message
+  
+  
+  final class ApiServiceConfiguration {
+      public static let shared = ApiServiceConfiguration()
+      
+      private init() {}
+      
+      var apiService: NetworkManager {
+          if shouldUseMockingService {
+              return APIMockManager.shared
+          } else {
+              return APIManager.shared
+          }
+      }
+      
+      private var shouldUseMockingService: Bool = false
+      
+      func setMockingServiceEnabled() {
+          shouldUseMockingService = true
       }
   }
   ```
@@ -223,122 +331,119 @@
   <summary>Экран со списком тест кейсов</summary>
 
   ```swift
-  import UIKit
-
-  final class SuitesAndCasesTableViewController: UIViewController {
-
-      var viewModel: SuitesAndCasesViewModel
-      
-      // MARK: - UI
-      
-      private lazy var tableVw: UITableView = {
-          let tv = UITableView()
-          tv.translatesAutoresizingMaskIntoConstraints = false
-          tv.rowHeight = UITableView.automaticDimension
-          tv.estimatedRowHeight = 44
-          tv.register(SuitesAndCasesTableViewCell.self, forCellReuseIdentifier: SuitesAndCasesTableViewCell.cellId)
-          return tv
-      }()
-      
-      private let emptyDataLabel: UILabel = {
-          let label = UILabel()
-          label.translatesAutoresizingMaskIntoConstraints = false
-          label.text = "There's nothing here yet 🙁"
-          label.textAlignment = .center
-          label.textColor = .gray
-          label.numberOfLines = 0
-          label.isHidden = true
-          return label
-      }()
-      
-      // MARK: - Lifecycles
-      
-      init(parentSuite: ParentSuite? = nil) {
-          self.viewModel = parentSuite != nil ? SuitesAndCasesViewModel(parentSuite: parentSuite) : SuitesAndCasesViewModel()
-          super.init(nibName: nil, bundle: nil)
-      }
-      
-      required init?(coder: NSCoder) {
-          fatalError("init(coder:) has not been implemented")
-      }
-      
-      override func viewDidLoad() {
-          super.viewDidLoad()
-          
-          viewModel.delegate = self
-          setupTableView()
-          navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addNewEntity))
-      }
-      
-      override func viewWillAppear(_ animated: Bool) {
-          super.viewWillAppear(true)
-          viewModel.requestEntitiesData()
-      }
-      
-      // MARK: - Setuping UI for tableView
-      func setupTableView() {
-          view.backgroundColor = AppTheme.bgPrimaryColor
-          title = viewModel.parentSuite == nil ? PROJECT_NAME
-          : self.viewModel.suitesAndCaseData.filter( {$0.isSuites && $0.id == self.viewModel.parentSuite?.id} ).first?.title
-          
-          tableVw.delegate = self
-          tableVw.dataSource = self
-          
-          view.addSubview(tableVw)
-          tableVw.addSubview(emptyDataLabel)
-          
-          tableVw.snp.makeConstraints {
-              $0.edges.equalTo(view.safeAreaLayoutGuide.snp.edges)
-          }
-          emptyDataLabel.snp.makeConstraints {
-              $0.center.equalToSuperview()
-          }
-      }
-      
-      private func updateEmptyDataLabelVisibility() {
-          emptyDataLabel.isHidden = viewModel.countOfRows() > 0
-      }
-      
-      // MARK: - @objc funcs
-      @objc func addNewEntity() {
-          let vc = CreateSuiteOrCaseViewController(viewModel: .init())
-          vc.modalPresentationStyle = .fullScreen
-          present(vc, animated: true)
-      }
+  final class TestEntitiesTableViewController: UIViewController {
+    
+    var viewModel: TestEntitiesViewModel
+    
+    // MARK: - UI
+    
+    private lazy var tableVw: UITableView = {
+        let tv = UITableView()
+        tv.translatesAutoresizingMaskIntoConstraints = false
+        tv.rowHeight = UITableView.automaticDimension
+        tv.estimatedRowHeight = 44
+        tv.register(SuitesAndCasesTableViewCell.self, forCellReuseIdentifier: SuitesAndCasesTableViewCell.cellId)
+        return tv
+    }()
+    
+    private let emptyDataLabel: UILabel = EmptyDataLabel()
+    
+    // MARK: - Lifecycles
+    
+    init(parentSuite: ParentSuite? = nil) {
+        viewModel = parentSuite != nil
+        ? TestEntitiesViewModel(parentSuite: parentSuite)
+        : TestEntitiesViewModel()
+        
+        super.init(nibName: nil, bundle: nil)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        viewModel.delegate = self
+        setupTableView()
+        configureRefreshControls()
+        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addNewEntity))
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(true)
+        executeWithErrorHandling {
+            try await self.viewModel.requestEntitiesData(place: .start)
+        }
+    }
+    
+    // MARK: - Setuping UI for tableView
+    func setupTableView() {
+        view.backgroundColor = AppTheme.bgPrimaryColor
+        title = viewModel.parentSuite == nil ? PROJECT_NAME
+        : self.viewModel.testEntitiesData.filter( {$0.isSuite && $0.id == self.viewModel.parentSuite?.id} ).first?.title
+        
+        tableVw.delegate = self
+        tableVw.dataSource = self
+        
+        view.addSubview(tableVw)
+        tableVw.addSubview(emptyDataLabel)
+        
+        tableVw.snp.makeConstraints {
+            $0.edges.equalTo(view.safeAreaLayoutGuide.snp.edges)
+        }
+        emptyDataLabel.snp.makeConstraints {
+            $0.center.equalToSuperview()
+        }
+    }
+    
+    private func updateEmptyDataLabelVisibility() {
+        emptyDataLabel.isHidden = viewModel.countOfRows() > 0
+    }
+    
+    // MARK: - @objc funcs
+    @objc func addNewEntity() {
+        let vc = CreateSuiteOrCaseViewController(viewModel: .init(parentSuiteId: viewModel.parentSuite?.id))
+        vc.modalPresentationStyle = .fullScreen
+        present(vc, animated: true)
+    }
   }
-
+  
   // MARK: - UpdateTableViewProtocol
-  extension SuitesAndCasesTableViewController: UpdateTableViewProtocol {
+  extension TestEntitiesTableViewController: UpdateTableViewProtocol {
       func updateTableView() {
-          DispatchQueue.main.async {
-              self.tableVw.reloadData()
+          Task { @MainActor in
+              tableVw.reloadData()
           }
       }
   }
-
+  
   // MARK: - NextViewControllerPusher
-  extension SuitesAndCasesTableViewController: NextViewControllerPusher {
+  extension TestEntitiesTableViewController: NextViewControllerPusher {
       func pushToNextVC(to item: Int?) {
           guard let item = item else { return }
-          let vc: UIViewController
-          let parentSuite = ParentSuite(id: viewModel.suitesAndCaseData[item].id, title: viewModel.suitesAndCaseData[item].title)
-          let caseItem = viewModel.suitesAndCaseData[item]
           
-          if viewModel.suitesAndCaseData[item].isSuites {
-              vc = SuitesAndCasesTableViewController(parentSuite: parentSuite)
+          let vc: UIViewController
+          let testEntityItem = viewModel.testEntitiesData[item]
+          let parentSuite = ParentSuite(id: testEntityItem.id, title: testEntityItem.title, codeOfProject: PROJECT_NAME)
+          let caseItem = viewModel.testEntitiesData[item]
+          
+          if testEntityItem.isSuite {
+              vc = TestEntitiesTableViewController(parentSuite: parentSuite)
           } else {
-              vc = DetailTabBarController(caseId: caseItem.id)
+              vc = TestCaseViewController(caseUniqueKey: "\(caseItem.id)_\(PROJECT_NAME)")
           }
-          self.navigationController?.pushViewController(vc, animated: true)
+          navigationController?.pushViewController(vc, animated: true)
       }
   }
-
+  
   // MARK: - Table view data source
-  extension SuitesAndCasesTableViewController: UITableViewDataSource {
+  extension TestEntitiesTableViewController: UITableViewDataSource {
       
       func numberOfSections(in tableView: UITableView) -> Int {
           updateEmptyDataLabelVisibility()
-          return viewModel.suitesAndCaseData.count > 0 ? 1 : 0
+          return viewModel.testEntitiesData.count > 0 ? 1 : 0
       }
       
       func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -350,23 +455,78 @@
       }
       
       func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-          guard let cell = tableView.dequeueReusableCell(withIdentifier: SuitesAndCasesTableViewCell.cellId, for: indexPath) as? SuitesAndCasesTableViewCell else { return UITableViewCell() }
+          guard let cell = tableView.dequeueReusableCell(
+              withIdentifier: SuitesAndCasesTableViewCell.cellId,
+              for: indexPath) as? SuitesAndCasesTableViewCell
+          else { return UITableViewCell() }
           
-          let dataForCell = viewModel.suitesAndCaseData[indexPath.row]
+          let dataForCell = viewModel.testEntitiesData[indexPath.row]
           cell.configure(with: dataForCell)
           
           return cell
-          
       }
       
       func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
           pushToNextVC(to: indexPath.row)
       }
   }
-
-  extension SuitesAndCasesTableViewController: UITableViewDelegate {
+  
+  // MARK: - Table view delegate
+  extension TestEntitiesTableViewController: UITableViewDelegate {
       func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
           return UITableView.automaticDimension
+      }
+      
+      func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+          let swipeAction = UIContextualAction(style: .destructive, title: "Delete".localized) { [weak self] _, _, completionHandler in
+              guard let self = self else { return }
+              let entity = viewModel.testEntitiesData[indexPath.row]
+              let entityName = entity.isSuite ? "Test suite".localized : "Test case".localized
+              let composedMessage = String(format: "confirmMessage".localized, entityName.localized.lowercased(), "")
+              
+              UIAlertController.showConfirmAlert(
+                  on: self,
+                  title: "Confirmation".localized,
+                  message: composedMessage) { _ in
+                      self.executeWithErrorHandling {
+                          try await self.viewModel.deleteEntity(at: indexPath.row)
+                      }
+                      completionHandler(true)
+                  } cancelCompetionHandler: { _ in
+                      completionHandler(false)
+                  }
+          }
+          swipeAction.image = AppTheme.trashImage
+          return UISwipeActionsConfiguration(actions: [swipeAction])
+      }
+      
+      func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+          if viewModel.testEntitiesData.count - indexPath.row <= 3 && !viewModel.isLoading {
+              executeWithErrorHandling { [weak self] in
+                  try await self?.viewModel.requestEntitiesData(place: .continuos)
+              }
+          }
+      }
+  }
+  
+  extension TestEntitiesTableViewController {
+      func configureRefreshControls() {
+          tableVw.refreshControl = UIRefreshControl()
+          tableVw.refreshControl?.addTarget(self,
+                                            action: #selector(handleRefreshControl),
+                                            for: .valueChanged)
+          
+          
+          let activityIndicatorView = UIActivityIndicatorView(style: .medium)
+          tableVw.tableFooterView = activityIndicatorView
+      }
+      
+      @objc func handleRefreshControl() {
+          executeWithErrorHandling {
+              try await self.viewModel.requestEntitiesData(place: .start)
+          }
+          
+          tableVw.refreshControl?.endRefreshing()
       }
   }
   ```
@@ -374,6 +534,8 @@
 
 # Основные достижения и результаты
 
+- Настройка базовой CI/CD на github actions
+- Написание unit/ui тестов
 - Успешная реализация приложения для ведения тестовой документации с локальным кешированием.
 - Реализация интуитивно понятного пользовательского интерфейса, который позволяет приятно отображать весь репозиторий.
 - Оптимизация производительности UI части, гарантирующая понятную и отзывчивую работу приложения.
