@@ -1,78 +1,141 @@
-<img src="https://github.com/ivn-srg/prtf-qase/blob/main/logo-2.jpeg" alt="Лого" style="width: 50px; height: 50px;"/>
+<img src="logo-2.jpeg" alt="Qase logo" width="50" height="50">
 
-# Mobile app for Qase TMS 
+# Qase Mobile
 
 ## Overview
 
-This project is an unofficial mobile client for Qase workflows. It gives users access to core test management entities from an iPhone through a native interface.
+An unofficial iOS client for Qase TMS, built for browsing projects and maintaining test documentation from an iPhone. It brings project summaries, a hierarchical test repository, case editing, and run and defect details into a native interface.
 
-The app works with a personal API token and focuses on project, repository, and test entity management.
+The app supports personal API tokens and a local demo that works without a Qase account.
 
-## Product Context
-
-The idea came from a simple gap: the workflow was useful, but there was no native mobile client for the scenarios I wanted to support.
-
-The app covers:
-- browsing projects
-- navigating repositories
-- viewing test entities
-- creating projects and repositories
-- working with structured test case content on mobile
+**[Source code — develop](https://github.com/ivn-srg/iOSPetProjectWithQaseAPI/tree/develop)** · **iOS 18.6+**
 
 ## My Role
 
-This was a solo project.
+This is a solo project. I handled the product idea, screen structure, UI, architecture, API integration, and network layer, connecting my iOS development work with QA workflows.
 
-I handled:
-- product idea
-- screen structure
-- architecture
-- UI
-- API integration
-- network layer
-- app-level technical decisions
+## Current Capabilities
 
-## Gallery
-<img src="https://github.com/ivn-srg/prtf-qase/blob/main/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-01-07%20at%2020.54.55.png" alt="main screen" width="250"><img src="https://github.com/ivn-srg/prtf-qase/blob/main/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202024-11-05%20at%2017.40.11.png" alt="projects screen" width="250"><img src="https://github.com/ivn-srg/prtf-qase/blob/main/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-01-07%20at%2020.55.07.png" alt="creating project screen" width="250"><img src="https://github.com/ivn-srg/prtf-qase/blob/main/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-01-07%20at%2020.55.44.png" alt="test entities list screen" width="250"><img src="https://github.com/ivn-srg/prtf-qase/blob/main/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-01-07%20at%2020.55.52.png" alt="creating test entity screen 1" width="250"><img src="https://github.com/ivn-srg/prtf-qase/blob/main/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-01-07%20at%2020.56.05.png" alt="creating test entity screen 2" width="250"><img src="https://github.com/ivn-srg/prtf-qase/blob/main/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-01-07%20at%2020.56.15.png" alt="detail test case main screen" width="250"><img src="https://github.com/ivn-srg/prtf-qase/blob/main/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-01-07%20at%2020.56.19.png" alt="detail test case screen with properties" width="250">
+- **Account and projects:** sign in with an API token, replace it from Settings, sign out, and browse, select, create, or delete projects. Real credentials are stored in Keychain; replacement tokens are validated before the active credentials change.
+- **Project home:** view case, suite, run, and defect counts, open the active run, and return to recently viewed cases.
+- **Test repository:** navigate nested suites and breadcrumbs, search cases and suites, load additional results, and delete suites or cases with confirmation.
+- **Documentation forms:** create suites and cases with a parent suite selection; edit case text, preconditions, postconditions, and classification and automation properties. Existing steps and expected results, including nested steps, can be viewed.
+- **Work:** browse run and defect lists and details, inspect run progress, and open associated cases.
+- **Preferences and saved data:** choose light, dark, or system appearance, use English or Russian through iOS language settings, and clear downloaded cache while keeping the active session, project selection, and viewing history.
 
-## Tech stack
+### Try Demo
 
-![Realm](https://img.shields.io/badge/Realm-5B8C4A?style=for-the-badge&logo=realm&logoColor=white)
-![Swift](https://img.shields.io/badge/Swift-F05138?style=for-the-badge&logo=swift&logoColor=white)
-![Apple UIKit](https://img.shields.io/badge/UIKit-007AFF?style=for-the-badge&logo=apple&logoColor=white)
-![SnapKit](https://img.shields.io/badge/SnapKit-FF4B30?style=for-the-badge&logo=swift&logoColor=white)
-![Async/Await](https://img.shields.io/badge/Async%20Await-4BCB1A?style=for-the-badge&logo=swift&logoColor=white)
-![MVVM](https://img.shields.io/badge/MVVM-FF3D00?style=for-the-badge&logo=swift&logoColor=white)
+1. Download the [develop branch](https://github.com/ivn-srg/iOSPetProjectWithQaseAPI/tree/develop) and open `QaseAPIProj.xcodeproj` in Xcode.
+2. Let Swift Package Manager resolve the dependencies, select the `QaseAPIProj` scheme, and run it on an iOS 18.6+ simulator or device. Configure your Signing Team for a physical device.
+3. Tap **Try demo** on the sign-in screen. No account or API token is required.
 
-## Project architecture
-The project uses `MVVM` and `Clean Architecture`.
+Demo uses bundled JSON data, local mock operations, and an isolated Realm store in memory. It makes no requests to Qase; demo edits are temporary. See the [development guide](https://github.com/ivn-srg/iOSPetProjectWithQaseAPI/blob/develop/docs/DEVELOPMENT.md) for setup details.
 
-The structure is organized around feature boundaries so the app can stay maintainable as new flows are added.
+## Screenshots
 
-Architecture snapshot:
+Current simulator captures in dark appearance. Long captures show the full screen content; sample test content is for illustration. Click any image to open its original size.
 
-<img src="https://github.com/ivn-srg/prtf-qase/blob/main/Снимок%20экрана%202024-11-05%20в%2018.01.59.png" alt="xcode code structure screen" width="250">
+<table>
+  <tr>
+    <th>Project home</th>
+    <th>Test repository</th>
+    <th>Settings</th>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><a href="Home-long.png"><img src="Home-long.png" alt="Project home with an active run, summary counts, and recent cases" height="420"></a></td>
+    <td align="center" valign="top"><a href="Repository-long.png"><img src="Repository-long.png" alt="Test repository with search, suites, and cases" height="420"></a></td>
+    <td align="center" valign="top"><a href="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.01.png"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.01.png" alt="Settings for appearance, language, API token, and cache" height="420"></a></td>
+  </tr>
+</table>
 
-## What I Did
+<details>
+<summary>More screens: sign-in, case editing, steps, creation, runs, and defects</summary>
 
-I implemented the app end to end, including:
-- API token authentication flow
-- navigation between projects, repositories, and entities
-- network layer and request composition
-- UI composition
-- architecture and feature organization
+<table>
+  <tr>
+    <th>Sign-in and demo entry</th>
+    <th>Case editor</th>
+    <th>Steps and expected results</th>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><a href="Screenshot%20iPhone%2018%20Pro%2013.%2010.%202026%20at%2023.43.14.png"><img src="Screenshot%20iPhone%2018%20Pro%2013.%2010.%202026%20at%2023.43.14.png" alt="API token sign-in with a Try demo button" height="420"></a></td>
+    <td align="center" valign="top"><a href="DEMO-11-long.png"><img src="DEMO-11-long.png" alt="Case editor with text, conditions, classification, and automation properties" height="420"></a></td>
+    <td align="center" valign="top"><a href="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.40.png"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.40.png" alt="Read-only case steps with nested actions and expected results" height="420"></a></td>
+  </tr>
+</table>
 
-## What This Project Shows
+<table>
+  <tr>
+    <th>Suite creation</th>
+    <th>Run details</th>
+    <th>Defects</th>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><a href="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.51.png"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.51.png" alt="Suite creation form with a suite/case selector and parent suite selection" height="420"></a></td>
+    <td align="center" valign="top"><a href="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.01.56.png"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.01.56.png" alt="Run details showing status, progress, and associated cases" height="420"></a></td>
+    <td align="center" valign="top"><a href="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.02.51.png"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.02.51.png" alt="Defect list with identifiers, severity, and status" height="420"></a></td>
+  </tr>
+</table>
 
-This case is relevant for:
-- API-driven iOS development
-- UIKit-based application structure
-- internal or niche workflow tools
-- B2B-style mobile flows
-- products with structured entities and backend-heavy logic
+</details>
 
-It also supports my positioning at the intersection of iOS and QA-oriented product work.
+## Tech Stack
 
-## Links
+| Technology | Role |
+| --- | --- |
+| Swift, language mode 5 | Application logic and models |
+| UIKit + SwiftUI | UIKit navigation, authentication, and forms; SwiftUI Home, Repository, Work, and Settings |
+| SnapKit | UIKit layout |
+| URLSession + async/await | Qase API requests and asynchronous loading |
+| Realm Swift | Local cache for downloaded data and viewing history |
+| Keychain | Real API credentials |
+| Swift Package Manager | Dependency management with pinned revisions |
+| MVVM + explicit dependency injection | Screen state and application composition |
+| Swift Testing + XCTest | Unit/regression tests and UI scenarios |
 
-- **Project code**: The code is located <a href="https://github.com/ivn-srg/iOSPetProjectWithQaseAPI">here</a>.
+## Engineering Decisions
+
+**Prevent stale responses from crossing sessions.** A request started before logout or token replacement can finish afterward. Models and cache writes check a captured session owner and generation before accepting results; token replacement rebuilds the authenticated dependency graph.
+
+**Keep cache identity and completeness explicit.** Qase entities can share IDs across projects. Cache keys include the local credential owner, project, and entity identity. Full repository snapshots are stored atomically; search results and partial pages do not overwrite complete catalogs. The owner marker is local to credentials, rather than a verified Qase user ID.
+
+**Protect edits across navigation and partial saves.** Suite and case creation maintain independent drafts when switching forms. Navigation checks offer save, discard, or stay, and saving blocks duplicate submissions and departure. After a partial success, the confirmed draft becomes the baseline so a retry does not resubmit it. Drafts live in memory.
+
+**Compose the hybrid interface with explicit dependencies.** UIKit hosts navigation and forms while SwiftUI renders the main sections. A composition root supplies dependencies through a screen factory and router. Live networking and the demo share contracts, allowing mock requests and an isolated cache without adding a separate set of demo screens.
+
+```mermaid
+flowchart TD
+    Root[AppCompositionRoot] --> UI[Screen factory and router]
+    Root --> Services[Network and cache dependencies]
+    UI --> Screens[UIKit and SwiftUI screens]
+    Screens --> Models[View models]
+    Models -->|reads| Repository[HomeRepository]
+    Repository --> Network[APIManager or APIMockManager]
+    Repository --> Cache[Realm cache]
+    Models -->|form requests| Network
+    Models -->|form cache access| Cache
+    Services -.-> Network
+    Services -.-> Cache
+```
+
+The repository coordinates reading and caching; forms also access networking and cache contracts directly. See [architecture and invariants](https://github.com/ivn-srg/iOSPetProjectWithQaseAPI/blob/develop/docs/ARCHITECTURE.md) for the detailed flow.
+
+## Testing
+
+The repository includes [unit and regression tests](https://github.com/ivn-srg/iOSPetProjectWithQaseAPI/tree/develop/QaseAPIProjTests) and [UI tests](https://github.com/ivn-srg/iOSPetProjectWithQaseAPI/tree/develop/QaseAPIProjUITests) for scenarios such as:
+
+- Rejecting invalid replacement tokens while keeping the current session and credentials.
+- Ignoring late responses after cancellation or a session change.
+- Keeping identical entity IDs separate across projects and rejecting stale cache writes.
+- Preserving independent drafts and retrying after a partial save without duplicating the successful operation.
+- Retaining edits when navigation is cancelled and sharing project selection across tabs.
+
+A [GitHub Actions workflow](https://github.com/ivn-srg/iOSPetProjectWithQaseAPI/blob/develop/.github/workflows/ios-ci.yml) defines build, unit, and UI checks. These links describe the existing checks; they do not establish a current passing run or a coverage figure.
+
+## Current Limits / Next Steps
+
+- **Repository editing:** case text and properties are editable; steps are read-only. Suite editing, changing a case's parent in the editor, and attachment workflows remain planned.
+- **Run execution:** runs and defects can be inspected, but recording test results and completing runs from the app remain planned.
+- **Persistence and offline:** downloaded data can be read from cache. Offline writes, queued synchronization, and restoring form drafts after relaunch are not implemented. Demo changes are temporary.
+
+See the [roadmap](https://github.com/ivn-srg/iOSPetProjectWithQaseAPI/blob/develop/docs/ROADMAP.md) for planned work and the [development guide](https://github.com/ivn-srg/iOSPetProjectWithQaseAPI/blob/develop/docs/DEVELOPMENT.md) for setup and manual verification.
