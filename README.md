@@ -35,14 +35,14 @@ Demo uses bundled JSON data, local mock operations, and an isolated Realm store 
 
 Current simulator captures in dark appearance. Long captures show the full screen content; sample test content is for illustration. Click any image to open its original size.
 
-<img src="Home-long.png" alt="Project home with an active run, summary counts, and recent cases" width="300"><img src="Repository-long.png" alt="Test repository with search, suites, and cases" width="300"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.01.png" alt="Settings for appearance, language, API token, and cache" width="300">
+<img src="Home-long.png" alt="Project home with an active run, summary counts, and recent cases" width="250"><img src="Repository-long.png" alt="Test repository with search, suites, and cases" width="250"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.01.png" alt="Settings for appearance, language, API token, and cache" width="250">
 
 <details>
 <summary>More screens: sign-in, case editing, steps, creation, runs, and defects</summary>
 
-<img src="Screenshot%20iPhone%2018%20Pro%2013.%2010.%202026%20at%2023.43.14.png" alt="API token sign-in with a Try demo button" width="300"><img src="DEMO-11-long.png" alt="Case editor with text, conditions, classification, and automation properties" width="300"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.40.png" alt="Read-only case steps with nested actions and expected results" width="300">
-<img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.51.png" alt="Suite creation form with a suite/case selector and parent suite selection" width="300"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.01.56.png" alt="Run details showing status, progress, and associated cases" width="300">
-<img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.02.51.png" alt="Defect list with identifiers, severity, and status" width="300">
+<img src="Screenshot%20iPhone%2018%20Pro%2013.%2010.%202026%20at%2023.43.14.png" alt="API token sign-in with a Try demo button" width="250"><img src="DEMO-11-long.png" alt="Case editor with text, conditions, classification, and automation properties" width="250"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.40.png" alt="Read-only case steps with nested actions and expected results" width="250">
+<img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.03.51.png" alt="Suite creation form with a suite/case selector and parent suite selection" width="250"><img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.01.56.png" alt="Run details showing status, progress, and associated cases" width="250">
+<img src="Screenshot%20iPhone%2018%20Pro%2014.%2010.%202026%20at%2000.02.51.png" alt="Defect list with identifiers, severity, and status" width="250">
 
 </details>
 
